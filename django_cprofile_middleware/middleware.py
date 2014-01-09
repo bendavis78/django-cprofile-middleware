@@ -2,7 +2,9 @@ try:
     import cProfile as profile
 except ImportError:
     import profile
+import os
 import pstats
+import tempfile
 from cStringIO import StringIO
 from django.conf import settings
 
@@ -45,7 +47,14 @@ class ProfilerMiddleware(object):
             self.profiler.create_stats()
             io = StringIO()
             stats = pstats.Stats(self.profiler, stream=io)
-            stats.strip_dirs().sort_stats(request.GET.get('sort', 'time'))
-            stats.print_stats(int(request.GET.get('count', 100)))
-            response.content = '<pre>%s</pre>' % io.getvalue()
+
+            if 'raw' in request.GET:
+                fd, outfile = tempfile.mkstemp()
+                stats.dump_stats(outfile)
+                response.content = open(outfile).read()
+                response['Content-Disposition'] = 'attachment; filename="results.profile"'
+            else:
+                stats.strip_dirs().sort_stats(request.GET.get('sort', 'time'))
+                stats.print_stats(int(request.GET.get('count', 100)))
+                response.content = '<pre>%s</pre>' % io.getvalue()
         return response
